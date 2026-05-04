@@ -10,3 +10,5 @@ RUN docker-php-ext-install mysqli pdo pdo_mysql
 RUN a2enmod rewrite
 
 EXPOSE 80
+
+RUN chmod -R 777 /var/www/html/upload

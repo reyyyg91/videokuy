@@ -1,24 +1,15 @@
-FROM php:8.2-apache
+FROM php:8.2-cli
 
-# Copy all files to the server
-COPY . /var/www/html/
+WORKDIR /app
 
-# Install MySQL extensions
+# Install MySQL extensions used by koneksi.php
 RUN docker-php-ext-install mysqli pdo pdo_mysql
 
-# Enable mod_rewrite
-RUN a2enmod rewrite
+# Copy application code
+COPY . /app
 
-# Create upload directory with permissions
-RUN mkdir -p /var/www/html/upload && chmod -R 777 /var/www/html/upload
+# Ensure runtime directories exist for uploaded files
+RUN mkdir -p /app/thumbnail /app/video && chmod -R 775 /app/thumbnail /app/video
 
-# Fix MPM: properly disable event, enable prefork
-RUN a2dismod mpm_event && a2enmod mpm_prefork
-
-# Configure Apache to listen on Railway's PORT (default 80 as fallback)
-RUN sed -i 's/Listen 80/Listen ${PORT:-80}/' /etc/apache2/ports.conf && \
-    sed -i 's/:80/:${PORT:-80}/' /etc/apache2/sites-available/000-default.conf
-
-EXPOSE ${PORT:-80}
-
-CMD ["apache2-foreground"]
+# Railway injects PORT at runtime
+CMD ["sh", "-c", "php -S 0.0.0.0:${PORT:-8080} -t /app /app/index.php"]

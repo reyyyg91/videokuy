@@ -11,4 +11,4 @@ RUN a2enmod rewrite
 
 EXPOSE 80
 
-RUN chmod -R 777 /var/www/html/upload
+RUN mkdir -p /var/www/html/upload && chmod -R 777 /var/www/html/upload

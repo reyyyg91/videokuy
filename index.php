@@ -63,4 +63,6 @@ if ($endpoint === "") {
     exit;
 }
 
+
+
 require_once $routes[$endpoint];

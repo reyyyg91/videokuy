@@ -6,21 +6,19 @@ header("Access-Control-Allow-Headers: Content-Type, Authorization");
 
 $requestUri = parse_url($_SERVER["REQUEST_URI"] ?? "/", PHP_URL_PATH);
 $path = trim((string) $requestUri, "/");
-$scriptName = trim((string) ($_SERVER["SCRIPT_NAME"] ?? ""), "/");
-$scriptDir = trim((string) dirname($scriptName), "/");
 
-// Normalisasi path agar tetap bekerja di root, subfolder, dan format /index.php/endpoint.
-if ($scriptDir !== "" && $path !== "" && strpos($path, $scriptDir . "/") === 0) {
-    $path = substr($path, strlen($scriptDir) + 1);
-}
-
-if ($path === trim($scriptName, "/")) {
-    $path = "";
-} elseif ($scriptName !== "" && strpos($path, trim($scriptName, "/") . "/") === 0) {
-    $path = substr($path, strlen(trim($scriptName, "/")) + 1);
-}
-
+// Normalisasi agar URL berikut semua valid:
+// /upload_data, /upload_data.php, /index.php/upload_data, /subdir/index.php/upload_data
 $segments = $path === "" ? [] : explode("/", $path);
+
+if (!empty($segments) && $segments[0] === "index.php") {
+    array_shift($segments);
+}
+
+if (count($segments) >= 2 && $segments[count($segments) - 2] === "index.php") {
+    $segments = [end($segments)];
+}
+
 $endpoint = count($segments) > 0 ? $segments[count($segments) - 1] : "";
 $endpoint = preg_replace("/\\.php$/", "", (string) $endpoint);
 

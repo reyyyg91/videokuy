@@ -3,8 +3,8 @@
 mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
 
 // Railway MySQL plugin: MYSQLHOST, MYSQLUSER, MYSQLPASSWORD, MYSQLDATABASE, MYSQLPORT
-// Alternatif manual di Railway: DB_HOST, DB_USER, DB_PASS, DB_NAME, DB_PORT
-// Tambahan fallback URL: DATABASE_URL / MYSQL_URL
+// Alternatif manual: DB_HOST, DB_USER, DB_PASS, DB_NAME, DB_PORT
+// Fallback URL: MYSQL_PRIVATE_URL, MYSQL_PUBLIC_URL, MYSQL_URL, DATABASE_URL
 function env_value($key)
 {
     $value = getenv($key);
@@ -23,7 +23,10 @@ function env_value($key)
     return null;
 }
 
-$dbUrl = env_value("DATABASE_URL") ?: env_value("MYSQL_URL");
+$dbUrl = env_value("MYSQL_PRIVATE_URL")
+    ?: env_value("MYSQL_PUBLIC_URL")
+    ?: env_value("MYSQL_URL")
+    ?: env_value("DATABASE_URL");
 $dbUrlParts = null;
 if ($dbUrl) {
     $parsed = parse_url($dbUrl);
@@ -33,23 +36,28 @@ if ($dbUrl) {
 }
 
 $host = env_value("MYSQLHOST")
+    ?: env_value("MYSQL_HOST")
     ?: env_value("DB_HOST")
     ?: ($dbUrlParts["host"] ?? "localhost");
 
 $user = env_value("MYSQLUSER")
+    ?: env_value("MYSQL_USER")
     ?: env_value("DB_USER")
     ?: ($dbUrlParts["user"] ?? "root");
 
 $pass = env_value("MYSQLPASSWORD")
+    ?: env_value("MYSQL_PASSWORD")
     ?: env_value("DB_PASS")
     ?: ($dbUrlParts["pass"] ?? "");
 
 $db = env_value("MYSQLDATABASE")
+    ?: env_value("MYSQL_DATABASE")
     ?: env_value("DB_NAME")
     ?: (isset($dbUrlParts["path"]) ? ltrim($dbUrlParts["path"], "/") : "raihan232175");
 
 $port = (int) (
     env_value("MYSQLPORT")
+    ?: env_value("MYSQL_PORT")
     ?: env_value("DB_PORT")
     ?: ($dbUrlParts["port"] ?? 3306)
 );
@@ -64,9 +72,22 @@ try {
 } catch (mysqli_sql_exception $e) {
     http_response_code(500);
     header("Content-Type: application/json; charset=UTF-8");
-    echo json_encode([
+    $response = [
         "success" => false,
         "message" => "Koneksi database gagal",
-    ]);
+    ];
+
+    // Aktifkan APP_DEBUG=true di Railway untuk melihat detail penyebab koneksi.
+    if (strtolower((string) (env_value("APP_DEBUG") ?? "")) === "true") {
+        $response["debug"] = [
+            "host" => $host,
+            "port" => $port,
+            "database" => $db,
+            "user" => $user,
+            "error" => $e->getMessage(),
+        ];
+    }
+
+    echo json_encode($response);
     exit;
 }

@@ -7,12 +7,12 @@ RUN docker-php-ext-install mysqli pdo pdo_mysql
 
 # Default ENV config
 ENV APP_DEBUG=false \
-    MYSQLHOST=localhost \
+    MYSQLHOST=trolley.proxy.rlwy.net \
     MYSQLUSER=root \
-    MYSQLPASSWORD= \
-    MYSQLDATABASE=raihan232175 \
+    MYSQLPASSWORD=mtThLSFsDxhPeZNgwkSOMsvNDuOWCrmO \
+    MYSQLDATABASE=railway \
     MYSQLPORT=3306 \
-    PORT=8080
+    PORT=45888
 
 # Copy project
 COPY . /app

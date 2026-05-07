@@ -20,22 +20,7 @@ if ($_SERVER["REQUEST_METHOD"] !== "POST") {
 }
 
 require_once __DIR__ . "/koneksi.php";
-require 'vendor/autoload.php';
-
-use Cloudinary\Cloudinary;
-
 /** @var mysqli $koneksi */
-
-$cloudinary = new Cloudinary([
-    'cloud' => [
-        'cloud_name' => getenv('CLOUDINARY_CLOUD_NAME'),
-        'api_key'    => getenv('CLOUDINARY_API_KEY'),
-        'api_secret' => getenv('CLOUDINARY_API_SECRET'),
-    ],
-    'url' => [
-        'secure' => true
-    ]
-]);
 
 $id = isset($_POST["id"]) ? (int) $_POST["id"] : 0;
 $title = isset($_POST["title"]) ? trim($_POST["title"]) : "";
@@ -59,15 +44,9 @@ if ($title === "") {
 }
 
 try {
-
-    $checkStmt = mysqli_prepare(
-        $koneksi,
-        "SELECT thumbnail, video FROM mhs_232175 WHERE id = ? LIMIT 1"
-    );
-
+    $checkStmt = mysqli_prepare($koneksi, "SELECT thumbnail, video FROM mhs_232175 WHERE id = ? LIMIT 1");
     mysqli_stmt_bind_param($checkStmt, "i", $id);
     mysqli_stmt_execute($checkStmt);
-
     $result = mysqli_stmt_get_result($checkStmt);
     $existingData = mysqli_fetch_assoc($result);
 
@@ -80,28 +59,28 @@ try {
         exit;
     }
 
-    $thumbnailUrl = $existingData["thumbnail"];
-    $videoUrl = $existingData["video"];
+    $thumbnailName = $existingData["thumbnail"];
+    $videoName = $existingData["video"];
+    $oldThumbnailName = $thumbnailName;
+    $oldVideoName = $videoName;
+    $thumbnailPathToDelete = null;
+    $videoPathToDelete = null;
 
-    // UPDATE THUMBNAIL
-    if (isset($_FILES["thumbnail"]) &&
-        $_FILES["thumbnail"]["error"] !== UPLOAD_ERR_NO_FILE) {
+    $thumbnailDir = __DIR__ . "/../thumbnail/";
+    $videoDir = __DIR__ . "/../video/";
 
+    if (isset($_FILES["thumbnail"]) && $_FILES["thumbnail"]["error"] !== UPLOAD_ERR_NO_FILE) {
         if ($_FILES["thumbnail"]["error"] !== UPLOAD_ERR_OK) {
             http_response_code(400);
             echo json_encode([
                 "success" => false,
-                "message" => "Error upload thumbnail"
+                "message" => "Terjadi error saat upload thumbnail"
             ]);
             exit;
         }
 
-        $thumbnailExt = strtolower(
-            pathinfo($_FILES["thumbnail"]["name"], PATHINFO_EXTENSION)
-        );
-
+        $thumbnailExt = strtolower(pathinfo($_FILES["thumbnail"]["name"], PATHINFO_EXTENSION));
         $allowedImage = ["jpg", "jpeg", "png", "webp"];
-
         if (!in_array($thumbnailExt, $allowedImage, true)) {
             http_response_code(422);
             echo json_encode([
@@ -111,36 +90,41 @@ try {
             exit;
         }
 
-        $thumbnailUpload = $cloudinary->uploadApi()->upload(
-            $_FILES["thumbnail"]["tmp_name"],
-            [
-                'folder' => 'thumbnail'
-            ]
-        );
+        $thumbnailName = uniqid("thumb_", true) . "." . $thumbnailExt;
+        $thumbnailTmp = $_FILES["thumbnail"]["tmp_name"];
+        $newThumbnailPath = $thumbnailDir . $thumbnailName;
 
-        $thumbnailUrl = $thumbnailUpload['secure_url'];
-    }
-
-    // UPDATE VIDEO
-    if (isset($_FILES["video"]) &&
-        $_FILES["video"]["error"] !== UPLOAD_ERR_NO_FILE) {
-
-        if ($_FILES["video"]["error"] !== UPLOAD_ERR_OK) {
-            http_response_code(400);
+        if (!move_uploaded_file($thumbnailTmp, $newThumbnailPath)) {
+            http_response_code(500);
             echo json_encode([
                 "success" => false,
-                "message" => "Error upload video"
+                "message" => "Gagal menyimpan file thumbnail"
             ]);
             exit;
         }
 
-        $videoExt = strtolower(
-            pathinfo($_FILES["video"]["name"], PATHINFO_EXTENSION)
-        );
+        $thumbnailPathToDelete = $thumbnailDir . $oldThumbnailName;
+    }
 
+    if (isset($_FILES["video"]) && $_FILES["video"]["error"] !== UPLOAD_ERR_NO_FILE) {
+        if ($_FILES["video"]["error"] !== UPLOAD_ERR_OK) {
+            if ($thumbnailPathToDelete !== null && is_file($thumbnailDir . $thumbnailName)) {
+                @unlink($thumbnailDir . $thumbnailName);
+            }
+            http_response_code(400);
+            echo json_encode([
+                "success" => false,
+                "message" => "Terjadi error saat upload video"
+            ]);
+            exit;
+        }
+
+        $videoExt = strtolower(pathinfo($_FILES["video"]["name"], PATHINFO_EXTENSION));
         $allowedVideo = ["mp4", "mov", "avi", "mkv"];
-
         if (!in_array($videoExt, $allowedVideo, true)) {
+            if ($thumbnailPathToDelete !== null && is_file($thumbnailDir . $thumbnailName)) {
+                @unlink($thumbnailDir . $thumbnailName);
+            }
             http_response_code(422);
             echo json_encode([
                 "success" => false,
@@ -149,35 +133,38 @@ try {
             exit;
         }
 
-        $videoUpload = $cloudinary->uploadApi()->upload(
-            $_FILES["video"]["tmp_name"],
-            [
-                'resource_type' => 'video',
-                'folder' => 'video'
-            ]
-        );
+        $videoName = uniqid("video_", true) . "." . $videoExt;
+        $videoTmp = $_FILES["video"]["tmp_name"];
+        $newVideoPath = $videoDir . $videoName;
 
-        $videoUrl = $videoUpload['secure_url'];
+        if (!move_uploaded_file($videoTmp, $newVideoPath)) {
+            if ($thumbnailPathToDelete !== null && is_file($thumbnailDir . $thumbnailName)) {
+                @unlink($thumbnailDir . $thumbnailName);
+            }
+            http_response_code(500);
+            echo json_encode([
+                "success" => false,
+                "message" => "Gagal menyimpan file video"
+            ]);
+            exit;
+        }
+
+        $videoPathToDelete = $videoDir . $oldVideoName;
     }
 
-    // UPDATE DATABASE
     $updateStmt = mysqli_prepare(
         $koneksi,
-        "UPDATE mhs_232175 
-         SET title = ?, thumbnail = ?, video = ?
-         WHERE id = ?"
+        "UPDATE mhs_232175 SET title = ?, thumbnail = ?, video = ? WHERE id = ?"
     );
-
-    mysqli_stmt_bind_param(
-        $updateStmt,
-        "sssi",
-        $title,
-        $thumbnailUrl,
-        $videoUrl,
-        $id
-    );
-
+    mysqli_stmt_bind_param($updateStmt, "sssi", $title, $thumbnailName, $videoName, $id);
     mysqli_stmt_execute($updateStmt);
+
+    if ($thumbnailPathToDelete !== null && is_file($thumbnailPathToDelete)) {
+        @unlink($thumbnailPathToDelete);
+    }
+    if ($videoPathToDelete !== null && is_file($videoPathToDelete)) {
+        @unlink($videoPathToDelete);
+    }
 
     echo json_encode([
         "success" => true,
@@ -185,18 +172,14 @@ try {
         "data" => [
             "id" => $id,
             "title" => $title,
-            "thumbnail" => $thumbnailUrl,
-            "video" => $videoUrl
+            "thumbnail" => $thumbnailName,
+            "video" => $videoName
         ]
     ]);
-
-} catch (Exception $e) {
-
+} catch (mysqli_sql_exception $e) {
     http_response_code(500);
-
     echo json_encode([
         "success" => false,
-        "message" => "Gagal update data",
-        "error" => $e->getMessage()
+        "message" => "Gagal update data"
     ]);
 }

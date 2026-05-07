@@ -14,117 +14,189 @@ if ($_SERVER["REQUEST_METHOD"] !== "POST") {
     http_response_code(405);
     echo json_encode([
         "success" => false,
-        "message" => "Method tidak diizinkan",
+        "message" => "Method tidak diizinkan"
     ]);
     exit;
 }
 
 require_once __DIR__ . "/koneksi.php";
+require 'vendor/autoload.php';
+
+use Cloudinary\Cloudinary;
+
 /** @var mysqli $koneksi */
 
+$cloudinary = new Cloudinary([
+    'cloud' => [
+        'cloud_name' => getenv('CLOUDINARY_CLOUD_NAME'),
+        'api_key'    => getenv('CLOUDINARY_API_KEY'),
+        'api_secret' => getenv('CLOUDINARY_API_SECRET'),
+    ],
+    'url' => [
+        'secure' => true
+    ]
+]);
+
+$id = isset($_POST["id"]) ? (int) $_POST["id"] : 0;
 $title = isset($_POST["title"]) ? trim($_POST["title"]) : "";
+
+if ($id <= 0) {
+    http_response_code(422);
+    echo json_encode([
+        "success" => false,
+        "message" => "ID wajib diisi"
+    ]);
+    exit;
+}
 
 if ($title === "") {
     http_response_code(422);
     echo json_encode([
         "success" => false,
-        "message" => "Title wajib diisi",
-    ]);
-    exit;
-}
-
-if (!isset($_FILES["thumbnail"], $_FILES["video"])) {
-    http_response_code(422);
-    echo json_encode([
-        "success" => false,
-        "message" => "Thumbnail dan video wajib diupload",
-    ]);
-    exit;
-}
-
-if ($_FILES["thumbnail"]["error"] !== UPLOAD_ERR_OK || $_FILES["video"]["error"] !== UPLOAD_ERR_OK) {
-    http_response_code(400);
-    echo json_encode([
-        "success" => false,
-        "message" => "Terjadi error saat upload file",
-    ]);
-    exit;
-}
-
-$thumbnailTmp = $_FILES["thumbnail"]["tmp_name"];
-$videoTmp = $_FILES["video"]["tmp_name"];
-
-$thumbnailExt = strtolower(pathinfo($_FILES["thumbnail"]["name"], PATHINFO_EXTENSION));
-$videoExt = strtolower(pathinfo($_FILES["video"]["name"], PATHINFO_EXTENSION));
-
-$allowedImage = ["jpg", "jpeg", "png", "webp"];
-$allowedVideo = ["mp4", "mov", "avi", "mkv"];
-
-if (!in_array($thumbnailExt, $allowedImage, true)) {
-    http_response_code(422);
-    echo json_encode([
-        "success" => false,
-        "message" => "Format thumbnail tidak didukung",
-    ]);
-    exit;
-}
-
-if (!in_array($videoExt, $allowedVideo, true)) {
-    http_response_code(422);
-    echo json_encode([
-        "success" => false,
-        "message" => "Format video tidak didukung",
-    ]);
-    exit;
-}
-
-$thumbnailName = uniqid("thumb_", true) . "." . $thumbnailExt;
-$videoName = uniqid("video_", true) . "." . $videoExt;
-
-$thumbnailPath = __DIR__ . "/../thumbnail/" . $thumbnailName;
-$videoPath = __DIR__ . "/../video/" . $videoName;
-
-if (!move_uploaded_file($thumbnailTmp, $thumbnailPath)) {
-    http_response_code(500);
-    echo json_encode([
-        "success" => false,
-        "message" => "Gagal menyimpan file thumbnail",
-    ]);
-    exit;
-}
-
-if (!move_uploaded_file($videoTmp, $videoPath)) {
-    @unlink($thumbnailPath);
-    http_response_code(500);
-    echo json_encode([
-        "success" => false,
-        "message" => "Gagal menyimpan file video",
+        "message" => "Title wajib diisi"
     ]);
     exit;
 }
 
 try {
-    $stmt = mysqli_prepare($koneksi, "INSERT INTO mhs_232175 (title, thumbnail, video) VALUES (?, ?, ?)");
-    mysqli_stmt_bind_param($stmt, "sss", $title, $thumbnailName, $videoName);
-    mysqli_stmt_execute($stmt);
 
-    http_response_code(201);
+    $checkStmt = mysqli_prepare(
+        $koneksi,
+        "SELECT thumbnail, video FROM mhs_232175 WHERE id = ? LIMIT 1"
+    );
+
+    mysqli_stmt_bind_param($checkStmt, "i", $id);
+    mysqli_stmt_execute($checkStmt);
+
+    $result = mysqli_stmt_get_result($checkStmt);
+    $existingData = mysqli_fetch_assoc($result);
+
+    if (!$existingData) {
+        http_response_code(404);
+        echo json_encode([
+            "success" => false,
+            "message" => "Data tidak ditemukan"
+        ]);
+        exit;
+    }
+
+    $thumbnailUrl = $existingData["thumbnail"];
+    $videoUrl = $existingData["video"];
+
+    // UPDATE THUMBNAIL
+    if (isset($_FILES["thumbnail"]) &&
+        $_FILES["thumbnail"]["error"] !== UPLOAD_ERR_NO_FILE) {
+
+        if ($_FILES["thumbnail"]["error"] !== UPLOAD_ERR_OK) {
+            http_response_code(400);
+            echo json_encode([
+                "success" => false,
+                "message" => "Error upload thumbnail"
+            ]);
+            exit;
+        }
+
+        $thumbnailExt = strtolower(
+            pathinfo($_FILES["thumbnail"]["name"], PATHINFO_EXTENSION)
+        );
+
+        $allowedImage = ["jpg", "jpeg", "png", "webp"];
+
+        if (!in_array($thumbnailExt, $allowedImage, true)) {
+            http_response_code(422);
+            echo json_encode([
+                "success" => false,
+                "message" => "Format thumbnail tidak didukung"
+            ]);
+            exit;
+        }
+
+        $thumbnailUpload = $cloudinary->uploadApi()->upload(
+            $_FILES["thumbnail"]["tmp_name"],
+            [
+                'folder' => 'thumbnail'
+            ]
+        );
+
+        $thumbnailUrl = $thumbnailUpload['secure_url'];
+    }
+
+    // UPDATE VIDEO
+    if (isset($_FILES["video"]) &&
+        $_FILES["video"]["error"] !== UPLOAD_ERR_NO_FILE) {
+
+        if ($_FILES["video"]["error"] !== UPLOAD_ERR_OK) {
+            http_response_code(400);
+            echo json_encode([
+                "success" => false,
+                "message" => "Error upload video"
+            ]);
+            exit;
+        }
+
+        $videoExt = strtolower(
+            pathinfo($_FILES["video"]["name"], PATHINFO_EXTENSION)
+        );
+
+        $allowedVideo = ["mp4", "mov", "avi", "mkv"];
+
+        if (!in_array($videoExt, $allowedVideo, true)) {
+            http_response_code(422);
+            echo json_encode([
+                "success" => false,
+                "message" => "Format video tidak didukung"
+            ]);
+            exit;
+        }
+
+        $videoUpload = $cloudinary->uploadApi()->upload(
+            $_FILES["video"]["tmp_name"],
+            [
+                'resource_type' => 'video',
+                'folder' => 'video'
+            ]
+        );
+
+        $videoUrl = $videoUpload['secure_url'];
+    }
+
+    // UPDATE DATABASE
+    $updateStmt = mysqli_prepare(
+        $koneksi,
+        "UPDATE mhs_232175 
+         SET title = ?, thumbnail = ?, video = ?
+         WHERE id = ?"
+    );
+
+    mysqli_stmt_bind_param(
+        $updateStmt,
+        "sssi",
+        $title,
+        $thumbnailUrl,
+        $videoUrl,
+        $id
+    );
+
+    mysqli_stmt_execute($updateStmt);
+
     echo json_encode([
         "success" => true,
-        "message" => "Data berhasil disimpan",
+        "message" => "Data berhasil diupdate",
         "data" => [
-            "id" => mysqli_insert_id($koneksi),
+            "id" => $id,
             "title" => $title,
-            "thumbnail" => $thumbnailName,
-            "video" => $videoName,
-        ],
+            "thumbnail" => $thumbnailUrl,
+            "video" => $videoUrl
+        ]
     ]);
-} catch (mysqli_sql_exception $e) {
-    @unlink($thumbnailPath);
-    @unlink($videoPath);
+
+} catch (Exception $e) {
+
     http_response_code(500);
+
     echo json_encode([
         "success" => false,
-        "message" => "Gagal simpan data ke database",
+        "message" => "Gagal update data",
+        "error" => $e->getMessage()
     ]);
 }

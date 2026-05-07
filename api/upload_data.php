@@ -14,7 +14,7 @@ if ($_SERVER["REQUEST_METHOD"] !== "POST") {
     http_response_code(405);
     echo json_encode([
         "success" => false,
-        "message" => "Method tidak diizinkan"
+        "message" => "Method tidak diizinkan",
     ]);
     exit;
 }
@@ -28,7 +28,7 @@ if ($title === "") {
     http_response_code(422);
     echo json_encode([
         "success" => false,
-        "message" => "Title wajib diisi"
+        "message" => "Title wajib diisi",
     ]);
     exit;
 }
@@ -37,7 +37,7 @@ if (!isset($_FILES["thumbnail"], $_FILES["video"])) {
     http_response_code(422);
     echo json_encode([
         "success" => false,
-        "message" => "Thumbnail dan video wajib diupload"
+        "message" => "Thumbnail dan video wajib diupload",
     ]);
     exit;
 }
@@ -46,7 +46,7 @@ if ($_FILES["thumbnail"]["error"] !== UPLOAD_ERR_OK || $_FILES["video"]["error"]
     http_response_code(400);
     echo json_encode([
         "success" => false,
-        "message" => "Terjadi error saat upload file"
+        "message" => "Terjadi error saat upload file",
     ]);
     exit;
 }
@@ -64,7 +64,7 @@ if (!in_array($thumbnailExt, $allowedImage, true)) {
     http_response_code(422);
     echo json_encode([
         "success" => false,
-        "message" => "Format thumbnail tidak didukung"
+        "message" => "Format thumbnail tidak didukung",
     ]);
     exit;
 }
@@ -73,7 +73,7 @@ if (!in_array($videoExt, $allowedVideo, true)) {
     http_response_code(422);
     echo json_encode([
         "success" => false,
-        "message" => "Format video tidak didukung"
+        "message" => "Format video tidak didukung",
     ]);
     exit;
 }
@@ -81,14 +81,14 @@ if (!in_array($videoExt, $allowedVideo, true)) {
 $thumbnailName = uniqid("thumb_", true) . "." . $thumbnailExt;
 $videoName = uniqid("video_", true) . "." . $videoExt;
 
-$thumbnailPath = "../thumbnail/" . $thumbnailName;
-$videoPath = "../video/" . $videoName;
+$thumbnailPath = __DIR__ . "/../thumbnail/" . $thumbnailName;
+$videoPath = __DIR__ . "/../video/" . $videoName;
 
 if (!move_uploaded_file($thumbnailTmp, $thumbnailPath)) {
     http_response_code(500);
     echo json_encode([
         "success" => false,
-        "message" => "Gagal menyimpan file thumbnail"
+        "message" => "Gagal menyimpan file thumbnail",
     ]);
     exit;
 }
@@ -98,7 +98,7 @@ if (!move_uploaded_file($videoTmp, $videoPath)) {
     http_response_code(500);
     echo json_encode([
         "success" => false,
-        "message" => "Gagal menyimpan file video"
+        "message" => "Gagal menyimpan file video",
     ]);
     exit;
 }
@@ -116,8 +116,8 @@ try {
             "id" => mysqli_insert_id($koneksi),
             "title" => $title,
             "thumbnail" => $thumbnailName,
-            "video" => $videoName
-        ]
+            "video" => $videoName,
+        ],
     ]);
 } catch (mysqli_sql_exception $e) {
     @unlink($thumbnailPath);
@@ -125,6 +125,6 @@ try {
     http_response_code(500);
     echo json_encode([
         "success" => false,
-        "message" => "Gagal simpan data ke database"
+        "message" => "Gagal simpan data ke database",
     ]);
 }

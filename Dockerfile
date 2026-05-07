@@ -2,14 +2,27 @@ FROM php:8.2-cli
 
 WORKDIR /app
 
-# Install MySQL extensions used by koneksi.php
+# Install ekstensi MySQL
 RUN docker-php-ext-install mysqli pdo pdo_mysql
 
-# Copy application code
+# Default ENV config
+ENV APP_DEBUG=false \
+    MYSQLHOST=localhost \
+    MYSQLUSER=root \
+    MYSQLPASSWORD= \
+    MYSQLDATABASE=raihan232175 \
+    MYSQLPORT=3306 \
+    PORT=8080
+
+# Copy project
 COPY . /app
 
-# Ensure runtime directories exist for uploaded files
-RUN mkdir -p /app/thumbnail /app/video && chmod -R 775 /app/thumbnail /app/video
+# Buat folder upload
+RUN mkdir -p /app/thumbnail /app/video && \
+    chmod -R 775 /app/thumbnail /app/video
 
-# Railway injects PORT at runtime
-CMD ["sh", "-c", "php -S 0.0.0.0:${PORT:-8080} -t /app /app/index.php"]
+# Expose port
+EXPOSE 8080
+
+# Run PHP server
+CMD ["sh", "-c", "php -S 0.0.0.0:${PORT} -t /app"]

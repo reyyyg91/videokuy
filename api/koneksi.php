@@ -1,5 +1,13 @@
 <?php
 
+require_once __DIR__ . '/../vendor/autoload.php';
+
+// Load .env file agar getenv() berfungsi
+if (class_exists('Dotenv\\Dotenv')) {
+    $dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/../');
+    $dotenv->load();
+}
+
 mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
 
 // Railway MySQL plugin: MYSQLHOST, MYSQLUSER, MYSQLPASSWORD, MYSQLDATABASE, MYSQLPORT
@@ -23,10 +31,7 @@ function env_value($key)
     return null;
 }
 
-$dbUrl = env_value("MYSQL_PRIVATE_URL")
-    ?: env_value("MYSQL_PUBLIC_URL")
-    ?: env_value("MYSQL_URL")
-    ?: env_value("DATABASE_URL");
+$dbUrl = env_value("DATABASE_URL") ?: env_value("MYSQL_URL") ?: env_value("MYSQL_PRIVATE_URL") ?: env_value("MYSQL_PUBLIC_URL");
 $dbUrlParts = null;
 if ($dbUrl) {
     $parsed = parse_url($dbUrl);

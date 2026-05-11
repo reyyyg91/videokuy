@@ -19,16 +19,38 @@ if ($_SERVER["REQUEST_METHOD"] !== "POST") {
     exit;
 }
 
+
+require __DIR__ . '/../vendor/autoload.php';
+
+// Load .env file agar getenv() berfungsi
+if (class_exists('Dotenv\\Dotenv')) {
+    $dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/../');
+    $dotenv->load();
+    $dotenv->required(['CLOUDINARY_CLOUD_NAME', 'CLOUDINARY_API_KEY', 'CLOUDINARY_API_SECRET']);
+}
+
 require_once __DIR__ . "/koneksi.php";
-require 'vendor/autoload.php';
 
 use Cloudinary\Cloudinary;
 
+$cloudName = getenv('CLOUDINARY_CLOUD_NAME') ?: ($_ENV['CLOUDINARY_CLOUD_NAME'] ?? null);
+$apiKey    = getenv('CLOUDINARY_API_KEY') ?: ($_ENV['CLOUDINARY_API_KEY'] ?? null);
+$apiSecret = getenv('CLOUDINARY_API_SECRET') ?: ($_ENV['CLOUDINARY_API_SECRET'] ?? null);
+
+if (!$cloudName || !$apiKey || !$apiSecret) {
+    http_response_code(500);
+    echo json_encode([
+        'success' => false,
+        'message' => 'Cloudinary configuration missing'
+    ]);
+    exit;
+}
+
 $cloudinary = new Cloudinary([
     'cloud' => [
-        'cloud_name' => getenv('CLOUDINARY_CLOUD_NAME'),
-        'api_key'    => getenv('CLOUDINARY_API_KEY'),
-        'api_secret' => getenv('CLOUDINARY_API_SECRET'),
+        'cloud_name' => $cloudName,
+        'api_key'    => $apiKey,
+        'api_secret' => $apiSecret,
     ],
     'url' => [
         'secure' => true

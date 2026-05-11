@@ -87,11 +87,20 @@ if (!in_array($thumbnailExt, $allowedImage, true)) {
     ]);
     exit;
 }
-$thumbnailUpload = $cloudinary->uploadApi()->upload(
-    $_FILES["thumbnail"]["tmp_name"],
-    [ 'folder' => 'thumbnail' ]
-);
-$thumbnailUrl = $thumbnailUpload['secure_url'];
+try {
+    $thumbnailUpload = $cloudinary->uploadApi()->upload(
+        $_FILES["thumbnail"]["tmp_name"],
+        [ 'folder' => 'thumbnail' ]
+    );
+    $thumbnailUrl = $thumbnailUpload['secure_url'];
+} catch (Exception $e) {
+    http_response_code(500);
+    echo json_encode([
+        'success' => false,
+        'message' => 'Upload thumbnail gagal: ' . $e->getMessage()
+    ]);
+    exit;
+}
 
 // UPLOAD VIDEO
 if (!isset($_FILES["video"]) || $_FILES["video"]["error"] !== UPLOAD_ERR_OK) {
@@ -112,11 +121,20 @@ if (!in_array($videoExt, $allowedVideo, true)) {
     ]);
     exit;
 }
-$videoUpload = $cloudinary->uploadApi()->upload(
-    $_FILES["video"]["tmp_name"],
-    [ 'resource_type' => 'video', 'folder' => 'video' ]
-);
-$videoUrl = $videoUpload['secure_url'];
+try {
+    $videoUpload = $cloudinary->uploadApi()->upload(
+        $_FILES["video"]["tmp_name"],
+        [ 'resource_type' => 'video', 'folder' => 'video' ]
+    );
+    $videoUrl = $videoUpload['secure_url'];
+} catch (Exception $e) {
+    http_response_code(500);
+    echo json_encode([
+        'success' => false,
+        'message' => 'Upload video gagal: ' . $e->getMessage()
+    ]);
+    exit;
+}
 
 // INSERT DATABASE
 $stmt = mysqli_prepare(
